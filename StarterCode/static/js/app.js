@@ -1,107 +1,100 @@
-// Belly Button Biodiversity by Elvis Selimaj, GWU BootCamp 
-
-// Function to pull names from json file and add them in the filter
-
-
-
-
-var drawChart = function(x_data, y_data, hoverText, metadata) {
-
-
-    var metadata_panel = d3.select("#sample-metadata");
-    metadata_panel.html("");
-    Object.entries(metadata).forEach(([key, value]) => {
-        metadata_panel.append("p").text(`${key}: ${value}`);
+function buildMetadata(sample) {
+    // @TODO: Complete the following function that builds the metadata panel
+    // Use `d3.json` to fetch the metadata for a sample
+    var url = `/metadata/${sample}`;
+    // Use d3 to select the panel with id of `#sample-metadata`
+    d3.json(url).then(function(response){
+      // if (error) return console.log(error);
+      var data = response;
+      var PANEL = d3.select("#sample-metadata");
+      // Use `.html("") to clear any existing metadata
+      PANEL.html("");
+      // Use `Object.entries` to add each key and value pair to the panel
+      Object.entries(data).forEach(([key, value]) => {
+        PANEL.append("p")
+        .text(`${key}:${value}`);
     });
+        // Hint: Inside the loop, you will need to use d3 to append new
+      // tags for each key-value in the metadata.
   
-    var trace = {
-        x: x_data,
-        y: y_data,
-        text: hoverText,
-        type: 'bar',
-        orientation: 'h'
-    };
+      // BONUS: Build the Gauge Chart
+      buildGauge(data.wfreq);
+    });
+  }
   
-    var data = [trace];
   
-    Plotly.newPlot('bar', data);
+  function buildCharts(sample) {
   
-    var trace2 = {
-        x: x_data,
-        y: y_data,
-        text: hoverText,
-        mode: 'markers',
-        marker: {
-            size: y_data,
-            color: x_data
+    // @TODO: Use `d3.json` to fetch the sample data for the plots
+    var url = `/samples/${sample}`;
+    d3.json(url).then(function (response){
+      // if (error) return console.log(error);
+      var x_value = response["otu_ids"];
+      var y_value = response["sample_values"];
+      var size_value = response["sample_values"];
+      var label = response["otu_labels"];
+      // @TODO: Build a Bubble Chart using the sample data
+      var trace1 = {
+        x: x_value,
+        y: y_value,
+        mode:"markers", 
+        marker:{
+          size: size_value,
+          color: x_value,
+          colorscale: "Rainbow",
+          labels: label,
+          type: 'scatter',
+          opacity: 0.3
         }
-    };
+      };
   
-    var data2 = [trace2];
+      var data1 = [trace1];
   
-    Plotly.newPlot('bubble', data2);
+      var layout = {
+        title: 'Marker Size',
+        xaxis: { title: 'OTU ID' },
+        showlegend: true
+      };
+      Plotly.newPlot("bubble", data1, layout); 
   
-  
-  };
-  
-  var populateDropdown = function(names) {
-  
-    var selectTag = d3.select("#selDataset");
-    var options = selectTag.selectAll('option').data(names);
-  
-    options.enter()
-        .append('option')
-        .attr('value', function(d) {
-            return d;
-        })
-        .text(function(d) {
-            return d;
-        });
-  
-  };
-  
-  var optionChanged = function(newValue) {
-  
-    d3.json("data/samples.json").then(function(data) {
-  
-    sample_new = data["samples"].filter(function(sample) {
-  
-        return sample.id == newValue;
-  
+      // @TODO: Build a Pie Chart
+      // HINT: You will need to use slice() to grab the top 10 sample_values,
+      // otu_ids, and labels (10 each).
+      var data = [{
+        values: size_value.splice(0, 10),
+        labels: x_value.splice(0, 10),
+        text: y_value.splice(0,10),
+        type: 'pie'
+      }];
+      Plotly.newPlot('pie', data);
     });
-    
-    metadata_new = data["metadata"].filter(function(metadata) {
+  }
   
-        return metadata.id == newValue;
+  function init() {
+    // Grab a reference to the dropdown select element
+    var selector = d3.select("#selDataset");
   
+    // Use the list of sample names to populate the select options
+    d3.json("/names").then((sampleNames) => {
+      sampleNames.forEach((sample) => {
+        selector
+          .append("option")
+          .text(sample)
+          .property("value", sample);
+      });
+  
+      // Use the first sample from the list to build the initial plots
+      const firstSample = sampleNames[0];
+      buildCharts(firstSample);
+      buildMetadata(firstSample);
     });
-    
-    
-    x_data = sample_new[0]["otu_ids"];
-    y_data = sample_new[0]["sample_values"];
-    hoverText = sample_new[0]["otu_labels"];
-    
-    console.log(x_data);
-    console.log(y_data);
-    console.log(hoverText);
-    
-    drawChart(x_data, y_data, hoverText, metadata_new[0]);
-    });
-  };
+  }
   
-  d3.json("data/samples.json").then(function(data) {
+  function optionChanged(newSample) {
+    // Fetch new data each time a new sample is selected
+    buildCharts(newSample);
+    buildMetadata(newSample);
+  }
   
-    //Populate dropdown with names
-    populateDropdown(data["names"]);
-  
-    //Populate the page with the first value
-    x_data = data["samples"][0]["otu_ids"];
-    y_data = data["samples"][0]["sample_values"];
-    hoverText = data["samples"][0]["otu_labels"];
-    metadata = data["metadata"][0];
-  
-    //Draw the chart on load
-    drawChart(x_data, y_data, hoverText, metadata);
-  
-  
-  });
+  // Initialize the dashboard
+  init();
